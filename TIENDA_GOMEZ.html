@@ -1,0 +1,1167 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Librería Gomez - Inventario y Control de Ventas</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        selva: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom print stylesheet for clean reporting */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .print-shadow-none {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Top Header -->
+    <header class="bg-selva-800 text-white shadow-lg no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white p-2 rounded-xl text-selva-800 shadow-md">
+                        <i class="fa-solid fa-tree text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-bold tracking-tight">Librería "GOMEZ"</h1>
+                        <p class="text-xs text-selva-100 flex items-center gap-2">
+                            <span><i class="fa-solid fa-phone"></i> 74006064 - 72097224</span>
+                            <span class="hidden sm:inline">•</span>
+                            <span class="hidden sm:inline"><i class="fa-solid fa-cash-register"></i> Control de Caja & Ventas</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Mode Indicator & Admin Login Toggle -->
+                <div class="flex items-center space-x-3 self-end md:self-auto">
+                    <div id="statusBadge" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span id="statusText">Modo Empleado (Ventas + Lectura)</span>
+                    </div>
+                    <button id="authBtn" onclick="toggleAdminAuth()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm px-4 py-2 rounded-lg font-medium transition shadow flex items-center gap-2">
+                        <i id="authIcon" class="fa-solid fa-lock"></i>
+                        <span id="authBtnText">Acceso Propietario</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- Banner for Mode Notification -->
+        <div id="modeNotification" class="hidden mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between no-print">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-user-shield text-xl text-amber-600"></i>
+                <div>
+                    <h4 class="font-bold text-sm">Modo Propietario Activado</h4>
+                    <p class="text-xs text-amber-700">Acceso completo a edición de precios, creación de productos, anulación de ventas y restablecimiento.</p>
+                </div>
+            </div>
+            <button onclick="lockAdminMode()" class="text-xs bg-amber-200 hover:bg-amber-300 px-3 py-1.5 rounded-md font-semibold transition">
+                Cerrar Sesión
+            </button>
+        </div>
+
+        <!-- Navigation Tabs (Inventario vs Ventas/Caja) -->
+        <div class="flex border-b border-slate-200 mb-6 no-print">
+            <button id="tabInventoryBtn" onclick="switchTab('inventory')" class="py-3 px-5 font-semibold text-sm border-b-2 border-selva-700 text-selva-800 flex items-center gap-2">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span>Inventario de Productos</span>
+            </button>
+            <button id="tabSalesBtn" onclick="switchTab('sales')" class="py-3 px-5 font-semibold text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-receipt"></i>
+                <span>Historial de Ventas / Caja Diaria</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: INVENTORY VIEW -->
+        <div id="inventorySection" class="space-y-6">
+
+            <!-- Quick Sale Bar for Employees -->
+            <div class="bg-gradient-to-r from-selva-800 to-emerald-700 p-4 sm:p-5 rounded-2xl text-white shadow-md no-print">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-bolt text-amber-300"></i>
+                    <h3 class="font-bold text-sm sm:text-base">Registro Rápido de Venta (Empleado)</h3>
+                </div>
+                <form id="quickSaleForm" onsubmit="handleQuickSale(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div class="lg:col-span-2">
+                        <label class="block text-[11px] font-medium text-emerald-100 mb-1">Buscar Producto</label>
+                        <select id="quickSaleSelect" onchange="fillQuickSaleDetails()" required class="w-full px-3 py-2 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white">
+                            <option value="">-- Seleccionar Producto --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-emerald-100 mb-1">Cantidad Vendida</label>
+                        <input type="number" id="quickSaleQty" min="0.1" step="any" required placeholder="1" class="w-full px-3 py-2 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-emerald-100 mb-1">Precio Unit. (Bs.)</label>
+                        <input type="number" id="quickSalePrice" min="0" step="0.01" required placeholder="0.00" class="w-full px-3 py-2 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-4 py-2 rounded-xl text-sm transition shadow flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-cart-plus"></i>
+                            <span>Registrar Venta</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Dashboard Summary Stats -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                        <i class="fa-solid fa-boxes-stacked text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Total Productos</p>
+                        <p id="statTotalItems" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                        <i class="fa-solid fa-cubes text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Total Unidades Stock</p>
+                        <p id="statTotalStock" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                        <i class="fa-solid fa-sack-dollar text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Valor Estimado Inventario</p>
+                        <p id="statTotalValue" class="text-2xl font-bold text-slate-800">Bs. 0.00</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                        <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Bajo Stock (&lt; 3 un.)</p>
+                        <p id="statLowStock" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls, Filters, and Toolbar -->
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 no-print">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    
+                    <!-- Search Input -->
+                    <div class="relative flex-grow max-w-md">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="searchInput" oninput="renderTable()" placeholder="Buscar por código o descripción..." class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-selva-500 text-sm">
+                    </div>
+
+                    <!-- Category Filter -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label for="categoryFilter" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoría:</label>
+                        <select id="categoryFilter" onchange="renderTable()" class="py-2 px-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-selva-500 text-sm bg-white">
+                            <option value="ALL">Todas las Categorías</option>
+                            <option value="Oficina y Escritorio">Oficina y Escritorio</option>
+                            <option value="Papelería y Cartulinas">Papelería y Cartulinas</option>
+                            <option value="Arte y Manualidades">Arte y Manualidades</option>
+                            <option value="Robótica y Electrónica">Robótica y Electrónica</option>
+                            <option value="Escolar y Didáctico">Escolar y Didáctico</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="addProductBtn" onclick="openProductModal()" class="hidden bg-selva-700 hover:bg-selva-800 text-white text-xs sm:text-sm px-3.5 py-2.5 rounded-xl font-medium transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Nuevo Producto</span>
+                        </button>
+
+                        <button onclick="window.print()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl font-medium transition flex items-center gap-2">
+                            <i class="fa-solid fa-print"></i>
+                            <span class="hidden sm:inline">Imprimir / PDF</span>
+                        </button>
+
+                        <button onclick="exportCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl font-medium transition flex items-center gap-2">
+                            <i class="fa-solid fa-file-csv"></i>
+                            <span class="hidden sm:inline">Exportar CSV</span>
+                        </button>
+
+                        <button id="resetDataBtn" onclick="resetToDefaultData()" class="hidden text-red-600 hover:bg-red-50 text-xs sm:text-sm px-3 py-2.5 rounded-xl font-medium transition flex items-center gap-1.5" title="Restablecer datos predeterminados">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Data Table -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                <th class="py-3.5 px-4">Código / Ref.</th>
+                                <th class="py-3.5 px-4">Descripción del Producto</th>
+                                <th class="py-3.5 px-4">Categoría</th>
+                                <th class="py-3.5 px-4 text-center">Cantidad</th>
+                                <th class="py-3.5 px-4 text-right">P.U. (Bs.)</th>
+                                <th class="py-3.5 px-4 text-right">Total (Bs.)</th>
+                                <th class="py-3.5 px-4 text-center no-print">Acción de Venta / Opciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody" class="divide-y divide-slate-100 text-sm">
+                            <!-- Rows dynamically rendered here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden p-12 text-center">
+                    <div class="inline-flex p-4 rounded-full bg-slate-100 text-slate-400 mb-3">
+                        <i class="fa-solid fa-box-open text-3xl"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-700">No se encontraron productos</h3>
+                    <p class="text-xs text-slate-500 mt-1">Intente cambiar el término de búsqueda o el filtro de categoría.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: SALES HISTORY & DAILY CASH -->
+        <div id="salesSection" class="space-y-6 hidden">
+            
+            <!-- Daily Sales Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-100 text-emerald-700 rounded-xl">
+                        <i class="fa-solid fa-cash-register text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Total Vendido (Hoy)</p>
+                        <p id="salesStatTodayBs" class="text-2xl font-bold text-emerald-700">Bs. 0.00</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-blue-100 text-blue-700 rounded-xl">
+                        <i class="fa-solid fa-shopping-bag text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Unidades Vendidas (Hoy)</p>
+                        <p id="salesStatTodayUnits" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-amber-100 text-amber-700 rounded-xl">
+                        <i class="fa-solid fa-receipt text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Transacciones Registradas</p>
+                        <p id="salesStatCount" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-purple-100 text-purple-700 rounded-xl">
+                        <i class="fa-solid fa-trophy text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-500">Top Producto Vendido</p>
+                        <p id="salesStatTopItem" class="text-sm font-bold text-slate-800 truncate max-w-[150px]">Ninguno</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales Filters & Toolbar -->
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Filtrar por Fecha:</label>
+                        <input type="date" id="salesDateFilter" onchange="renderSalesTable()" class="px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-selva-500 bg-white">
+                    </div>
+                    <button onclick="clearSalesDateFilter()" class="self-end px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl transition border border-slate-200">
+                        Mostrar Todo
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="window.print()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl font-medium transition flex items-center gap-2">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Imprimir Reporte</span>
+                    </button>
+                    <button onclick="exportSalesCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl font-medium transition flex items-center gap-2">
+                        <i class="fa-solid fa-file-csv"></i>
+                        <span>Exportar Ventas CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sales Log Table -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                <th class="py-3.5 px-4">Fecha / Hora</th>
+                                <th class="py-3.5 px-4">Código</th>
+                                <th class="py-3.5 px-4">Producto</th>
+                                <th class="py-3.5 px-4 text-center">Cant.</th>
+                                <th class="py-3.5 px-4 text-right">P.U. Venta (Bs.)</th>
+                                <th class="py-3.5 px-4 text-right">Total Venta (Bs.)</th>
+                                <th class="py-3.5 px-4 text-center">Atendido Por</th>
+                                <th id="salesActionHeader" class="py-3.5 px-4 text-center hidden no-print">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesTableBody" class="divide-y divide-slate-100 text-sm">
+                            <!-- Sales rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="salesEmptyState" class="hidden p-12 text-center">
+                    <div class="inline-flex p-4 rounded-full bg-slate-100 text-slate-400 mb-3">
+                        <i class="fa-solid fa-receipt text-3xl"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-700">No hay ventas registradas</h3>
+                    <p class="text-xs text-slate-500 mt-1">Realice registros de venta desde la pestaña de inventario.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 no-print mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center space-y-2">
+            <p>© 2026 Librería "La Selva" - Sistema Integrado de Control de Inventario y Caja</p>
+            <p class="text-slate-500">Sucursales: Ceja, Villa Adela, Periférica, Villa Copacabana | Contacto: 74006064 - 72097224</p>
+        </div>
+    </footer>
+
+    <!-- Modal for Quick Direct Sale Row Action -->
+    <div id="rowSaleModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div class="flex items-center justify-between border-b pb-3 border-slate-100">
+                <h3 class="text-base font-bold text-slate-800">Registrar Venta Directa</h3>
+                <button onclick="closeRowSaleModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="rowSaleForm" onsubmit="confirmRowSale(event)" class="space-y-4">
+                <input type="hidden" id="modalSaleIndex">
+                
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <p id="modalSaleCode" class="text-xs font-mono font-bold text-selva-700"></p>
+                    <p id="modalSaleName" class="text-sm font-semibold text-slate-800"></p>
+                    <p id="modalSaleStock" class="text-xs text-slate-500 mt-1"></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Cantidad Vendida *</label>
+                        <input type="number" id="modalSaleQty" min="0.1" step="any" required value="1" oninput="calcModalSaleTotal()" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Precio Unit. (Bs.) *</label>
+                        <input type="number" id="modalSalePrice" min="0" step="0.01" required oninput="calcModalSaleTotal()" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Vendedor / Nota (Opcional)</label>
+                    <input type="text" id="modalSaleSeller" placeholder="Ej: Juan - Turno Mañana" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none">
+                </div>
+
+                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200 flex justify-between items-center text-emerald-900 font-bold text-sm">
+                    <span>Total a Cobrar:</span>
+                    <span id="modalSaleTotalBs" class="text-lg">Bs. 0.00</span>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeRowSaleModal()" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-medium hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-selva-700 hover:bg-selva-800 text-white text-xs font-medium transition shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-check"></i>
+                        <span>Confirmar Venta</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Admin PIN Entry -->
+    <div id="pinModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+            <div class="text-center space-y-1">
+                <div class="inline-flex p-3 rounded-full bg-amber-100 text-amber-600 mb-2">
+                    <i class="fa-solid fa-user-lock text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800">Modo Propietario</h3>
+                <p class="text-xs text-slate-500">Ingrese su PIN de seguridad para editar catálogo y anular ventas.</p>
+            </div>
+
+            <div>
+                <input type="password" id="pinInput" maxlength="10" placeholder="PIN de acceso (Predeterminado: 1234)" class="w-full text-center tracking-widest text-lg py-2.5 px-4 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-selva-500 font-mono">
+                <p id="pinError" class="text-xs text-red-500 mt-1 text-center hidden font-medium">PIN incorrecto. Intente de nuevo.</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="closePinModal()" class="w-full py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium text-xs hover:bg-slate-50 transition">
+                    Cancelar
+                </button>
+                <button onclick="verifyPin()" class="w-full py-2.5 rounded-xl bg-selva-700 hover:bg-selva-800 text-white font-medium text-xs transition shadow-sm">
+                    Ingresar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Product Creation/Edition -->
+    <div id="productModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4 overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between border-b pb-3 border-slate-100">
+                <h3 id="modalTitle" class="text-base font-bold text-slate-800">Añadir Nuevo Producto</h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="productForm" onsubmit="saveProduct(event)" class="space-y-4">
+                <input type="hidden" id="editIndex" value="-1">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Código / Referencia *</label>
+                        <input type="text" id="prodCode" required placeholder="Ej: [HY1086-AZUL]" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
+                        <select id="prodCategory" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none bg-white">
+                            <option value="Oficina y Escritorio">Oficina y Escritorio</option>
+                            <option value="Papelería y Cartulinas">Papelería y Cartulinas</option>
+                            <option value="Arte y Manualidades">Arte y Manualidades</option>
+                            <option value="Robótica y Electrónica">Robótica y Electrónica</option>
+                            <option value="Escolar y Didáctico">Escolar y Didáctico</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Descripción del Producto *</label>
+                    <textarea id="prodDesc" required rows="2" placeholder="Nombre completo o detalles del producto" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Cantidad *</label>
+                        <input type="number" id="prodQty" min="0" step="any" required placeholder="0" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Precio Unitario (Bs.) *</label>
+                        <input type="number" id="prodPrice" min="0" step="0.01" required placeholder="0.00" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-selva-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeProductModal()" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-medium hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-selva-700 hover:bg-selva-800 text-white text-xs font-medium transition shadow-sm">
+                        Guardar Producto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+<!-- Application Script -->
+    <script>
+        // Initial default dataset
+        const defaultInventory = [
+            { code: "ARC-ART-OFI", desc: "Archivador artesanal Oficio", category: "Oficina y Escritorio", qty: 2.0, price: 50.00 },
+            { code: "EH303-FC", desc: "Funda Oficio LA SELVA 5,5 MICRA", category: "Oficina y Escritorio", qty: 32.0, price: 3.00 },
+            { code: "EH303-LT", desc: "Funda Carta LA SELVA 5,5 MICRA", category: "Oficina y Escritorio", qty: 29.0, price: 3.00 },
+            { code: "AA927-AZ", desc: "Bolígrafo Beifa 50PCS (Azul)", category: "Oficina y Escritorio", qty: 31.0, price: 2.00 },
+            { code: "AA927-NE", desc: "Bolígrafo Beifa 50PCS (Negro)", category: "Oficina y Escritorio", qty: 31.0, price: 2.00 },
+            { code: "AA927-RO", desc: "Bolígrafo Beifa 50PCS (Rojo)", category: "Oficina y Escritorio", qty: 31.0, price: 2.00 },
+            { code: "100T-AZ", desc: "Bolígrafo Monami Rayado 12PCS (Azul)", category: "Oficina y Escritorio", qty: 17.0, price: 2.00 },
+            { code: "100T-NE", desc: "Bolígrafo Monami Rayado 12PCS (Negro)", category: "Oficina y Escritorio", qty: 17.0, price: 2.00 },
+            { code: "100T-RO", desc: "Bolígrafo Monami Rayado 12PCS (Rojo)", category: "Oficina y Escritorio", qty: 17.0, price: 2.00 },
+            { code: "BPN139", desc: "Bolígrafo Nataraj 621 Fine 0.7MM 50PCS (Negro)", category: "Oficina y Escritorio", qty: 35.0, price: 2.00 },
+            { code: "BPN140", desc: "Bolígrafo Nataraj 621 Fine 0.7MM 50PCS (Azul)", category: "Oficina y Escritorio", qty: 35.0, price: 2.00 },
+            { code: "BPN141", desc: "Bolígrafo Nataraj 621 Fine 0.7MM 50PCS (Rojo)", category: "Oficina y Escritorio", qty: 35.0, price: 2.00 },
+            { code: "HY1086-AZUL", desc: "Bolígrafo borrable frixion ZUIXUA 12pcs (Azul)", category: "Oficina y Escritorio", qty: 17.0, price: 2.00 },
+            { code: "HY1086-NEGRO", desc: "Bolígrafo borrable frixion ZUIXUA 12pcs (Negro)", category: "Oficina y Escritorio", qty: 17.0, price: 2.00 },
+            { code: "HY1086-ROJO", desc: "Bolígrafo borrable frixion ZUIXUA 12pcs (Rojo)", category: "Oficina y Escritorio", qty: 17.0, price: 2.00 },
+            { code: "FB2013-AZ", desc: "Bolígrafo perfumado 0.7mm Sabonis 24PCS (Azul)", category: "Oficina y Escritorio", qty: 45.0, price: 2.00 },
+            { code: "FB2013-NE", desc: "Bolígrafo perfumado 0.7mm Sabonis 24PCS (Negro)", category: "Oficina y Escritorio", qty: 45.0, price: 2.00 },
+            { code: "FB2013-RO", desc: "Bolígrafo perfumado 0.7mm Sabonis 24PCS (Rojo)", category: "Oficina y Escritorio", qty: 45.0, price: 2.00 },
+            { code: "2RH/25MM", desc: "Chinche con dos patas 100pcs", category: "Oficina y Escritorio", qty: 6.5, price: 10.00 },
+            { code: "81-317/330", desc: "Tambor de agujas 24 juegos 2/5", category: "Oficina y Escritorio", qty: 30.0, price: 1.00 },
+            { code: "ALF-01", desc: "Alfileres normal No2 2.5cm, cajita de 50gr.", category: "Oficina y Escritorio", qty: 2.5, price: 10.00 },
+            { code: "ALF-02", desc: "Alfileres Con cabeza", category: "Oficina y Escritorio", qty: 10.5, price: 3.00 },
+            { code: "AR-2", desc: "Aguja Roma Mediano No 8-A 25 pcs", category: "Oficina y Escritorio", qty: 11.0, price: 1.00 },
+            { code: "DL833", desc: "Chincheta colores 10x50pcs", category: "Oficina y Escritorio", qty: 22.0, price: 1.00 },
+            { code: "S206", desc: "Chinche Escolar, pata de 15mm S206 10 cajitas de 40pcs", category: "Oficina y Escritorio", qty: 13.5, price: 1.00 },
+            { code: "48100Y", desc: "Cinta de embalaje o scoch La Selva de 100Y, tubo de 6PCS", category: "Oficina y Escritorio", qty: 32.0, price: 2.00 },
+            { code: "YT1215-PL", desc: "Yurex Tornasol 12mmx15m 12pcs (Plata)", category: "Arte y Manualidades", qty: 8.0, price: 1.00 },
+            { code: "YT1215-NE", desc: "Yurex Tornasol 12mmx15m 12pcs (Negro)", category: "Arte y Manualidades", qty: 8.0, price: 1.00 },
+            { code: "16311011", desc: "Color largo triangular mina de 4MM Artesco 12 Colores + 2 lápices + tajador", category: "Escolar y Didáctico", qty: 16.67, price: 6.00 },
+            { code: "120712SOFT+2", desc: "Color largo redondo Super Soft Faber Castell 12 colores", category: "Escolar y Didáctico", qty: 25.0, price: 6.00 },
+            { code: "120112+2AR", desc: "Color largo hexagonal Faber Castell + estuche", category: "Escolar y Didáctico", qty: 16.17, price: 6.00 },
+            { code: "LS417-12", desc: "Color largo triangular mina 4mm La Selva 12 colores", category: "Escolar y Didáctico", qty: 12.91, price: 6.00 },
+            { code: "7869", desc: "Color largo premium Madison 12 colores", category: "Escolar y Didáctico", qty: 20.0, price: 3.00 },
+            { code: "P7000", desc: "Color largo hexagonal Sabonis 12colores", category: "Escolar y Didáctico", qty: 17.5, price: 6.00 },
+            { code: "8528", desc: "Corrector Cinta Madison M-70 GRANDE", category: "Oficina y Escritorio", qty: 6.67, price: 12.00 },
+            { code: "AS127", desc: "Corrector tipo bolígrafo Skill Hands 9ml", category: "Oficina y Escritorio", qty: 3.33, price: 12.00 },
+            { code: "C50180-AM", desc: "Papel crepe normal 180x50cm La Selva, 10hojas (Amarillo)", category: "Papelería y Cartulinas", qty: 12.5, price: 1.00 },
+            { code: "C50180-AZ", desc: "Papel crepe normal 180x50cm La Selva, 10hojas (Azul)", category: "Papelería y Cartulinas", qty: 12.5, price: 1.00 },
+            { code: "C50180-CA", desc: "Papel crepe normal 180x50cm La Selva, 10hojas (Café)", category: "Papelería y Cartulinas", qty: 12.5, price: 1.00 },
+            { code: "LW-ANLL-100-CA", desc: "Cuaderno anillado artesanal Carta 100h", category: "Escolar y Didáctico", qty: 11.0, price: 10.00 },
+            { code: "ANLL-100-ELBA-CA", desc: "Cuaderno anillado artesanal carta elba 100h", category: "Escolar y Didáctico", qty: 11.5, price: 10.00 },
+            { code: "11102", desc: "Cuaderno anillado medio oficio cuadro normal 5mm tapa DISEÑOS Winner 100h", category: "Escolar y Didáctico", qty: 10.0, price: 10.00 },
+            { code: "AAMO-100N", desc: "Cuaderno anillado artesanal Medio oficio 100h", category: "Escolar y Didáctico", qty: 6.8, price: 10.00 },
+            { code: "2029", desc: "Ajedrez grande 3 juegos", category: "Escolar y Didáctico", qty: 18.0, price: 12.00 },
+            { code: "GEOF-NO-AM", desc: "Goma eva Oficio Normal (Amarillo)", category: "Arte y Manualidades", qty: 0.9, price: 10.00 },
+            { code: "GEOF-NO-AZ", desc: "Goma eva Oficio Normal (Azul)", category: "Arte y Manualidades", qty: 0.9, price: 10.00 },
+            { code: "GEOF-NO-BL", desc: "Goma eva Oficio Normal (Blanco)", category: "Arte y Manualidades", qty: 0.9, price: 10.00 },
+            { code: "GE50X70-BR-AM", desc: "Goma eva 50x70 Brillo (Amarillo)", category: "Arte y Manualidades", qty: 5.4, price: 5.00 },
+            { code: "GE50X70-BR-AZ", desc: "Goma eva 50x70 Brillo (Azul)", category: "Arte y Manualidades", qty: 5.4, price: 5.00 },
+            { code: "4829", desc: "Hojas de carpeta cuadro normal Líder 500hjs", category: "Papelería y Cartulinas", qty: 36.0, price: 6.00 },
+            { code: "HJ-MOCHI", desc: "Hojas de carpeta MOCHILERA 500hjs", category: "Papelería y Cartulinas", qty: 31.0, price: 6.00 },
+            { code: "ADV", desc: "Robótica - adaptador o conector de batería de 9V", category: "Robótica y Electrónica", qty: 1.5, price: 12.00 },
+            { code: "E15", desc: "Robótica - interruptor bicolor 10x15mm", category: "Robótica y Electrónica", qty: 1.25, price: 12.00 },
+            { code: "FA130", desc: "Robótica - motorcito aplanada DC, revoluciones 2000rpm, voltaje 3-9V", category: "Robótica y Electrónica", qty: 5.00, price: 12.00 },
+            { code: "TT130", desc: "Robótica - motorcito reductor DC con protector amarillo, revoluciones 300rpm", category: "Robótica y Electrónica", qty: 8.00, price: 12.00 },
+            { code: "TEX-502", desc: "Pintura para Tela Acrilex Textil 37ml (Azul Cobalto)", category: "Arte y Manualidades", qty: 7.50, price: 1.00 },
+            { code: "LUSTRE-AMA", desc: "Papel lustroso 65x50 cm (Amarillo)", category: "Papelería y Cartulinas", qty: 0.80, price: 5.00 },
+            { code: "LUSTRE-AZU", desc: "Papel lustroso 65x50 cm (Azul)", category: "Papelería y Cartulinas", qty: 0.80, price: 10.00 },
+            { code: "PEG-612", desc: "Pegamento Super glue 12pcs", category: "Oficina y Escritorio", qty: 7.60, price: 25.00 },
+            { code: "JS-82MS-3", desc: "Calculadora Científica JOINUS JS-82MS-3 COLORES 240 funciones", category: "Oficina y Escritorio", qty: 22.50, price: 3.00 },
+            { code: "ESF-1", desc: "Esfera de plastoformo #1 25PCS", category: "Arte y Manualidades", qty: 4.00, price: 1.00 },
+            { code: "ESF-6", desc: "Esfera de plastoformo #6 25PCS", category: "Arte y Manualidades", qty: 19.00, price: 1.00 }
+        ];
+
+        // System State
+        let inventory = [];
+        let salesHistory = [];
+        let isAdmin = false;
+        const ADMIN_PIN = "1234";
+
+        // Initialization
+        window.onload = function() {
+            loadAllData();
+            populateQuickSaleDropdown();
+            renderTable();
+            renderSalesTable();
+            // Set today's default date on sales filter
+            document.getElementById('salesDateFilter').value = new Date().toISOString().slice(0, 10);
+        };
+
+        function loadAllData() {
+            const savedInv = localStorage.getItem('la_selva_inventory');
+            if (savedInv) {
+                try { inventory = JSON.parse(savedInv); } catch(e) { inventory = [...defaultInventory]; }
+            } else {
+                inventory = [...defaultInventory];
+            }
+
+            const savedSales = localStorage.getItem('la_selva_sales');
+            if (savedSales) {
+                try { salesHistory = JSON.parse(savedSales); } catch(e) { salesHistory = []; }
+            } else {
+                salesHistory = [];
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('la_selva_inventory', JSON.stringify(inventory));
+            localStorage.setItem('la_selva_sales', JSON.stringify(salesHistory));
+            populateQuickSaleDropdown();
+            renderTable();
+            renderSalesTable();
+        }
+
+        function resetToDefaultData() {
+            if (confirm("¿Está seguro de restablecer el inventario a los valores predeterminados?")) {
+                inventory = [...defaultInventory];
+                salesHistory = [];
+                saveData();
+            }
+        }
+
+        // Tab Switching Logic
+        function switchTab(tab) {
+            const invSec = document.getElementById('inventorySection');
+            const salesSec = document.getElementById('salesSection');
+            const tabInvBtn = document.getElementById('tabInventoryBtn');
+            const tabSalesBtn = document.getElementById('tabSalesBtn');
+
+            if (tab === 'inventory') {
+                invSec.classList.remove('hidden');
+                salesSec.classList.add('hidden');
+                tabInvBtn.className = "py-3 px-5 font-semibold text-sm border-b-2 border-selva-700 text-selva-800 flex items-center gap-2";
+                tabSalesBtn.className = "py-3 px-5 font-semibold text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2";
+            } else {
+                invSec.classList.add('hidden');
+                salesSec.classList.remove('hidden');
+                tabSalesBtn.className = "py-3 px-5 font-semibold text-sm border-b-2 border-selva-700 text-selva-800 flex items-center gap-2";
+                tabInvBtn.className = "py-3 px-5 font-semibold text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2";
+                renderSalesTable();
+            }
+        }
+
+        // Populate Quick Sale Select Options
+        function populateQuickSaleDropdown() {
+            const select = document.getElementById('quickSaleSelect');
+            select.innerHTML = '<option value="">-- Seleccionar Producto --</option>';
+            inventory.forEach((item, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.textContent = `${item.code} - ${item.desc} (Stock: ${item.qty})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function fillQuickSaleDetails() {
+            const index = document.getElementById('quickSaleSelect').value;
+            if (index !== "") {
+                const item = inventory[index];
+                document.getElementById('quickSalePrice').value = item.price;
+                document.getElementById('quickSaleQty').value = 1;
+            } else {
+                document.getElementById('quickSalePrice').value = "";
+                document.getElementById('quickSaleQty').value = "";
+            }
+        }
+
+        // Handle Quick Sale Submission (Employee Top Panel)
+        function handleQuickSale(e) {
+            e.preventDefault();
+            const index = document.getElementById('quickSaleSelect').value;
+            if (index === "") return alert("Seleccione un producto para registrar la venta.");
+
+            const qty = parseFloat(document.getElementById('quickSaleQty').value);
+            const unitPrice = parseFloat(document.getElementById('quickSalePrice').value);
+            const item = inventory[index];
+
+            if (qty <= 0) return alert("Ingrese una cantidad válida mayor a cero.");
+            if (qty > item.qty) {
+                if (!confirm(`Atención: La cantidad a vender (${qty}) supera el stock actual (${item.qty}). ¿Desea proceder de todos modos?`)) {
+                    return;
+                }
+            }
+
+            // Create Sale Entry
+            const now = new Date();
+            const saleRecord = {
+                id: 'V-' + Date.now(),
+                timestamp: now.toISOString(),
+                dateStr: now.toISOString().slice(0, 10),
+                timeStr: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                code: item.code,
+                desc: item.desc,
+                qty: qty,
+                unitPrice: unitPrice,
+                totalBs: qty * unitPrice,
+                seller: 'Empleado'
+            };
+
+            // Deduct inventory stock
+            item.qty = Math.max(0, item.qty - qty);
+            salesHistory.unshift(saleRecord);
+
+            // Reset Quick Sale form
+            document.getElementById('quickSaleForm').reset();
+            saveData();
+            alert(`Venta registrada con éxito: ${saleRecord.desc} (Bs. ${saleRecord.totalBs.toFixed(2)})`);
+        }
+
+        // Direct Row Sale Modal Logic
+        function openRowSaleModal(index) {
+            const item = inventory[index];
+            document.getElementById('modalSaleIndex').value = index;
+            document.getElementById('modalSaleCode').textContent = item.code;
+            document.getElementById('modalSaleName').textContent = item.desc;
+            document.getElementById('modalSaleStock').textContent = `Stock disponible: ${item.qty} unidades`;
+            document.getElementById('modalSaleQty').value = 1;
+            document.getElementById('modalSalePrice').value = item.price;
+            document.getElementById('modalSaleSeller').value = "";
+            
+            calcModalSaleTotal();
+            document.getElementById('rowSaleModal').classList.remove('hidden');
+        }
+
+        function closeRowSaleModal() {
+            document.getElementById('rowSaleModal').classList.add('hidden');
+        }
+
+        function calcModalSaleTotal() {
+            const qty = parseFloat(document.getElementById('modalSaleQty').value) || 0;
+            const price = parseFloat(document.getElementById('modalSalePrice').value) || 0;
+            const total = qty * price;
+            document.getElementById('modalSaleTotalBs').textContent = `Bs. ${total.toFixed(2)}`;
+        }
+
+        function confirmRowSale(e) {
+            e.preventDefault();
+            const index = document.getElementById('modalSaleIndex').value;
+            const item = inventory[index];
+            const qty = parseFloat(document.getElementById('modalSaleQty').value);
+            const unitPrice = parseFloat(document.getElementById('modalSalePrice').value);
+            const seller = document.getElementById('modalSaleSeller').value.trim() || 'Empleado';
+
+            if (qty <= 0) return alert("Ingrese una cantidad válida.");
+            if (qty > item.qty) {
+                if (!confirm(`La cantidad vendida (${qty}) es mayor al stock disponible (${item.qty}). ¿Continuar?`)) return;
+            }
+
+            const now = new Date();
+            const saleRecord = {
+                id: 'V-' + Date.now(),
+                timestamp: now.toISOString(),
+                dateStr: now.toISOString().slice(0, 10),
+                timeStr: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                code: item.code,
+                desc: item.desc,
+                qty: qty,
+                unitPrice: unitPrice,
+                totalBs: qty * unitPrice,
+                seller: seller
+            };
+
+            item.qty = Math.max(0, item.qty - qty);
+            salesHistory.unshift(saleRecord);
+
+            closeRowSaleModal();
+            saveData();
+        }
+
+        // Toggle Admin Dialog / Action
+        function toggleAdminAuth() {
+            if (isAdmin) {
+                lockAdminMode();
+            } else {
+                document.getElementById('pinInput').value = '';
+                document.getElementById('pinError').classList.add('hidden');
+                document.getElementById('pinModal').classList.remove('hidden');
+                document.getElementById('pinInput').focus();
+            }
+        }
+
+        function closePinModal() {
+            document.getElementById('pinModal').classList.add('hidden');
+        }
+
+        function verifyPin() {
+            const pin = document.getElementById('pinInput').value;
+            if (pin === ADMIN_PIN) {
+                isAdmin = true;
+                closePinModal();
+                updateAdminUI();
+                renderTable();
+                renderSalesTable();
+            } else {
+                document.getElementById('pinError').classList.remove('hidden');
+            }
+        }
+
+        function lockAdminMode() {
+            isAdmin = false;
+            updateAdminUI();
+            renderTable();
+            renderSalesTable();
+        }
+
+        function updateAdminUI() {
+            const statusText = document.getElementById('statusText');
+            const statusBadge = document.getElementById('statusBadge');
+            const authBtnText = document.getElementById('authBtnText');
+            const authIcon = document.getElementById('authIcon');
+            const modeNotification = document.getElementById('modeNotification');
+            const addProductBtn = document.getElementById('addProductBtn');
+            const resetDataBtn = document.getElementById('resetDataBtn');
+            const salesActionHeader = document.getElementById('salesActionHeader');
+
+            if (isAdmin) {
+                statusText.textContent = "Modo Propietario (Acceso Total)";
+                statusBadge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300";
+                authBtnText.textContent = "Bloquear Edición";
+                authIcon.className = "fa-solid fa-lock-open";
+                modeNotification.classList.remove('hidden');
+                addProductBtn.classList.remove('hidden');
+                resetDataBtn.classList.remove('hidden');
+                salesActionHeader.classList.remove('hidden');
+            } else {
+                statusText.textContent = "Modo Empleado (Ventas + Lectura)";
+                statusBadge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300";
+                authBtnText.textContent = "Acceso Propietario";
+                authIcon.className = "fa-solid fa-lock";
+                modeNotification.classList.add('hidden');
+                addProductBtn.classList.add('hidden');
+                resetDataBtn.classList.add('hidden');
+                salesActionHeader.classList.add('hidden');
+            }
+        }
+
+        // Render Inventory Table
+        function renderTable() {
+            const tbody = document.getElementById('inventoryTableBody');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+            const catVal = document.getElementById('categoryFilter').value;
+            const emptyState = document.getElementById('emptyState');
+
+            tbody.innerHTML = '';
+
+            let filtered = inventory.filter(item => {
+                const matchesSearch = item.code.toLowerCase().includes(searchVal) || item.desc.toLowerCase().includes(searchVal);
+                const matchesCat = (catVal === 'ALL') || (item.category === catVal);
+                return matchesSearch && matchesCat;
+            });
+
+            // Calculate Inventory Statistics
+            let totalItemsCount = filtered.length;
+            let totalStockQty = 0;
+            let totalValueBs = 0;
+            let lowStockCount = 0;
+
+            filtered.forEach(item => {
+                const itemQty = parseFloat(item.qty) || 0;
+                const itemPrice = parseFloat(item.price) || 0;
+                const itemTotal = itemQty * itemPrice;
+
+                totalStockQty += itemQty;
+                totalValueBs += itemTotal;
+                if (itemQty < 3) lowStockCount++;
+            });
+
+            document.getElementById('statTotalItems').textContent = totalItemsCount;
+            document.getElementById('statTotalStock').textContent = totalStockQty.toLocaleString('es-BO');
+            document.getElementById('statTotalValue').textContent = `Bs. ${totalValueBs.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('statLowStock').textContent = lowStockCount;
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach((item) => {
+                const realIndex = inventory.indexOf(item);
+                const itemQty = parseFloat(item.qty) || 0;
+                const itemPrice = parseFloat(item.price) || 0;
+                const itemTotal = itemQty * itemPrice;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition-colors";
+
+                let lowStockBadge = itemQty < 3 
+                    ? `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded border border-amber-200">Bajo Stock</span>` 
+                    : '';
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs font-semibold text-slate-700">${escapeHtml(item.code)}</td>
+                    <td class="py-3 px-4">
+                        <div class="font-medium text-slate-800">${escapeHtml(item.desc)} ${lowStockBadge}</div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="inline-block px-2.5 py-1 text-xs rounded-lg bg-slate-100 text-slate-600 font-medium border border-slate-200">
+                            ${escapeHtml(item.category || 'General')}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        ${isAdmin ? 
+                            `<input type="number" min="0" step="any" value="${itemQty}" onchange="inlineUpdate(${realIndex}, 'qty', this.value)" class="w-20 text-center py-1 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-selva-500 focus:outline-none">` : 
+                            `<span class="font-semibold text-slate-700">${itemQty}</span>`
+                        }
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        ${isAdmin ? 
+                            `<input type="number" min="0" step="0.01" value="${itemPrice}" onchange="inlineUpdate(${realIndex}, 'price', this.value)" class="w-24 text-right py-1 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-selva-500 focus:outline-none">` : 
+                            `<span class="text-slate-700">Bs. ${itemPrice.toFixed(2)}</span>`
+                        }
+                    </td>
+                    <td class="py-3 px-4 text-right font-bold text-selva-800">
+                        Bs. ${itemTotal.toFixed(2)}
+                    </td>
+                    <td class="py-3 px-4 text-center no-print">
+                        <div class="flex items-center justify-center space-x-2">
+                            <button onclick="openRowSaleModal(${realIndex})" class="bg-amber-500 hover:bg-amber-600 text-slate-900 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm" title="Anotar Venta">
+                                <i class="fa-solid fa-cart-shopping text-[10px]"></i>
+                                <span>Vender</span>
+                            </button>
+                            ${isAdmin ? `
+                                <button onclick="openProductModal(${realIndex})" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Editar Producto">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="deleteProduct(${realIndex})" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="Eliminar Producto">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Inline quick update for Qty / Price in Admin mode
+        function inlineUpdate(index, field, value) {
+            const num = parseFloat(value);
+            if (!isNaN(num) && num >= 0) {
+                inventory[index][field] = num;
+                saveData();
+            }
+        }
+
+        // Render Sales Table & Sales Summary Stats
+        function renderSalesTable() {
+            const tbody = document.getElementById('salesTableBody');
+            const dateFilter = document.getElementById('salesDateFilter').value;
+            const salesEmptyState = document.getElementById('salesEmptyState');
+
+            tbody.innerHTML = '';
+
+            let filteredSales = salesHistory.filter(s => {
+                if (!dateFilter) return true;
+                return s.dateStr === dateFilter;
+            });
+
+            // Calculate Today's / Filtered Sales Metrics
+            const todayStr = new Date().toISOString().slice(0, 10);
+            let todayTotalBs = 0;
+            let todayUnits = 0;
+            let productSalesCounter = {};
+
+            salesHistory.forEach(s => {
+                if (s.dateStr === todayStr) {
+                    todayTotalBs += (s.totalBs || 0);
+                    todayUnits += (s.qty || 0);
+                }
+                productSalesCounter[s.desc] = (productSalesCounter[s.desc] || 0) + s.qty;
+            });
+
+            // Find Top Selling Item overall
+            let topItemName = "Ninguno";
+            let maxQty = 0;
+            for (let name in productSalesCounter) {
+                if (productSalesCounter[name] > maxQty) {
+                    maxQty = productSalesCounter[name];
+                    topItemName = name;
+                }
+            }
+
+            document.getElementById('salesStatTodayBs').textContent = `Bs. ${todayTotalBs.toFixed(2)}`;
+            document.getElementById('salesStatTodayUnits').textContent = todayUnits;
+            document.getElementById('salesStatCount').textContent = filteredSales.length;
+            document.getElementById('salesStatTopItem').textContent = topItemName;
+
+            if (filteredSales.length === 0) {
+                salesEmptyState.classList.remove('hidden');
+            } else {
+                salesEmptyState.classList.add('hidden');
+            }
+
+            filteredSales.forEach((sale) => {
+                const realIndex = salesHistory.indexOf(sale);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-xs text-slate-600">
+                        <span class="font-semibold block text-slate-800">${sale.dateStr}</span>
+                        <span>${sale.timeStr || ''}</span>
+                    </td>
+                    <td class="py-3 px-4 font-mono text-xs text-slate-600">${escapeHtml(sale.code)}</td>
+                    <td class="py-3 px-4 font-medium text-slate-800">${escapeHtml(sale.desc)}</td>
+                    <td class="py-3 px-4 text-center font-bold text-slate-700">${sale.qty}</td>
+                    <td class="py-3 px-4 text-right text-slate-600">Bs. ${parseFloat(sale.unitPrice).toFixed(2)}</td>
+                    <td class="py-3 px-4 text-right font-bold text-emerald-700">Bs. ${parseFloat(sale.totalBs).toFixed(2)}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-2 py-0.5 text-xs rounded bg-slate-100 text-slate-600 font-medium">${escapeHtml(sale.seller || 'Empleado')}</span>
+                    </td>
+                    ${isAdmin ? `
+                        <td class="py-3 px-4 text-center no-print">
+                            <button onclick="cancelSale(${realIndex})" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="Anular / Borrar Venta">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    ` : ''}
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function clearSalesDateFilter() {
+            document.getElementById('salesDateFilter').value = "";
+            renderSalesTable();
+        }
+
+        function cancelSale(index) {
+            const sale = salesHistory[index];
+            if (confirm(`¿Anular la venta de "${sale.desc}" por Bs. ${sale.totalBs.toFixed(2)}? \n\nEsto repondrá ${sale.qty} unidad(es) al inventario.`)) {
+                // Find product and restore stock
+                const prod = inventory.find(i => i.code === sale.code);
+                if (prod) {
+                    prod.qty += sale.qty;
+                }
+                salesHistory.splice(index, 1);
+                saveData();
+            }
+        }
+      // Product Modal Handlers
+        function openProductModal(index = -1) {
+            const modal = document.getElementById('productModal');
+            const title = document.getElementById('modalTitle');
+            const editIndex = document.getElementById('editIndex');
+
+            editIndex.value = index;
+
+            if (index >= 0) {
+                title.textContent = "Editar Producto";
+                const item = inventory[index];
+                document.getElementById('prodCode').value = item.code;
+                document.getElementById('prodDesc').value = item.desc;
+                document.getElementById('prodCategory').value = item.category || 'Oficina y Escritorio';
+                document.getElementById('prodQty').value = item.qty;
+                document.getElementById('prodPrice').value = item.price;
+            } else {
+                title.textContent = "Añadir Nuevo Producto";
+                document.getElementById('productForm').reset();
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModal').classList.add('hidden');
+        }
+
+        function saveProduct(e) {
+            e.preventDefault();
+            const index = parseInt(document.getElementById('editIndex').value);
+            
+            const newItem = {
+                code: document.getElementById('prodCode').value.trim(),
+                desc: document.getElementById('prodDesc').value.trim(),
+                category: document.getElementById('prodCategory').value,
+                qty: parseFloat(document.getElementById('prodQty').value) || 0,
+                price: parseFloat(document.getElementById('prodPrice').value) || 0
+            };
+
+            if (index >= 0) {
+                inventory[index] = newItem;
+            } else {
+                inventory.unshift(newItem);
+            }
+
+            saveData();
+            closeProductModal();
+        }
+
+        function deleteProduct(index) {
+            if (confirm(`¿Eliminar el producto "${inventory[index].desc}" del inventario?`)) {
+                inventory.splice(index, 1);
+                saveData();
+            }
+        }
+
+        // CSV Export Functions
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Codigo,Descripcion,Categoria,Cantidad,Precio_Unitario_Bs,Total_Bs\n";
+
+            inventory.forEach(item => {
+                const qty = parseFloat(item.qty) || 0;
+                const price = parseFloat(item.price) || 0;
+                const total = qty * price;
+                const cleanDesc = `"${item.desc.replace(/"/g, '""')}"`;
+                const cleanCode = `"${item.code.replace(/"/g, '""')}"`;
+                const cleanCat = `"${(item.category || '').replace(/"/g, '""')}"`;
+
+                csvContent += `${cleanCode},${cleanDesc},${cleanCat},${qty},${price},${total}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Inventario_La_Selva_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportSalesCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Fecha,Hora,Codigo,Producto,Cantidad,Precio_Unitario_Bs,Total_Bs,Atendido_Por\n";
+
+            salesHistory.forEach(s => {
+                const cleanDesc = `"${s.desc.replace(/"/g, '""')}"`;
+                const cleanCode = `"${s.code.replace(/"/g, '""')}"`;
+                const cleanSeller = `"${(s.seller || '').replace(/"/g, '""')}"`;
+
+                csvContent += `${s.dateStr},${s.timeStr},${cleanCode},${cleanDesc},${s.qty},${s.unitPrice},${s.totalBs},${cleanSeller}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Ventas_La_Selva_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // String Escaping Helper
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+    </script>
+</body>
+</html>
